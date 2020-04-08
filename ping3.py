@@ -8,6 +8,7 @@ import time
 import threading
 import logging
 import functools
+import platform
 
 import errors
 from enums import ICMP_DEFAULT_CODE, IcmpType, IcmpTimeExceededCode, IcmpDestinationUnreachableCode
@@ -28,6 +29,7 @@ def _debug(*args, **kwargs):
     Args:
         *args: Any. Usually are strings or objects that can be converted to str.
     """
+
     def get_logger():
         logger = logging.getLogger(__name__)
         logger.setLevel(logging.DEBUG)
@@ -70,6 +72,7 @@ def _func_logger(func: callable) -> callable:
     Returns:
         Decorated function.
     """
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         pargs = ", ".join(["'{}'".format(arg) if isinstance(arg, str) else arg for arg in args])
@@ -141,6 +144,7 @@ def read_ip_header(raw: bytes) -> dict:
     Returns:
         A map contains the infos from the raw header.
     """
+
     def stringify_ip(ip: int) -> str:
         return ".".join([str(ip >> offset & 0xff) for offset in (24, 16, 8, 0)])  # str(ipaddress.ip_address(ip))
 
@@ -171,21 +175,26 @@ def send_one_ping(sock: socket, dest_addr: str, icmp_id: int, seq: int, size: in
     """
     _debug("Destination Address: '{}'".format(dest_addr))
     try:
-        dest_addr = socket.gethostbyname(dest_addr)  # Domain name will translated into IP address, and IP address leaves unchanged.
+        dest_addr = socket.gethostbyname(
+            dest_addr)  # Domain name will translated into IP address, and IP address leaves unchanged.
     except socket.gaierror as e:
         raise errors.HostUnknown(dest_addr) from e
     _debug("Destination Address:", dest_addr)
     pseudo_checksum = 0  # Pseudo checksum is used to calculate the real checksum.
-    icmp_header = struct.pack(ICMP_HEADER_FORMAT, IcmpType.ECHO_REQUEST, ICMP_DEFAULT_CODE, pseudo_checksum, icmp_id, seq)
+    icmp_header = struct.pack(ICMP_HEADER_FORMAT, IcmpType.ECHO_REQUEST, ICMP_DEFAULT_CODE, pseudo_checksum, icmp_id,
+                              seq)
     padding = (size - struct.calcsize(ICMP_TIME_FORMAT)) * "Q"  # Using double to store current time.
     icmp_payload = struct.pack(ICMP_TIME_FORMAT, time.time()) + padding.encode()
-    real_checksum = checksum(icmp_header + icmp_payload)  # Calculates the checksum on the dummy header and the icmp_payload.
+    real_checksum = checksum(
+        icmp_header + icmp_payload)  # Calculates the checksum on the dummy header and the icmp_payload.
     # Don't know why I need socket.htons() on real_checksum since ICMP_HEADER_FORMAT already in Network Bytes Order (big-endian)
-    icmp_header = struct.pack(ICMP_HEADER_FORMAT, IcmpType.ECHO_REQUEST, ICMP_DEFAULT_CODE, socket.htons(real_checksum), icmp_id, seq)  # Put real checksum into ICMP header.
+    icmp_header = struct.pack(ICMP_HEADER_FORMAT, IcmpType.ECHO_REQUEST, ICMP_DEFAULT_CODE, socket.htons(real_checksum),
+                              icmp_id, seq)  # Put real checksum into ICMP header.
     _debug("Sent ICMP Header:", read_icmp_header(icmp_header))
     _debug("Sent ICMP Payload:", icmp_payload)
     packet = icmp_header + icmp_payload
-    sock.sendto(packet, (dest_addr, 0))  # addr = (ip, port). Port is 0 respectively the OS default behavior will be used.
+    sock.sendto(packet,
+                (dest_addr, 0))  # addr = (ip, port). Port is 0 respectively the OS default behavior will be used.
 
 
 @_func_logger
@@ -213,7 +222,8 @@ def receive_one_ping(sock: socket, icmp_id: int, seq: int, timeout: int) -> floa
         DestinationUnreachable: If the destination is unreachable.
     """
     ip_header_slice = slice(0, struct.calcsize(IP_HEADER_FORMAT))  # [0:20]
-    icmp_header_slice = slice(ip_header_slice.stop, ip_header_slice.stop + struct.calcsize(ICMP_HEADER_FORMAT))  # [20:28]
+    icmp_header_slice = slice(ip_header_slice.stop,
+                              ip_header_slice.stop + struct.calcsize(ICMP_HEADER_FORMAT))  # [20:28]
     timeout_time = time.time() + timeout  # Exactly time when timeout.
     _debug("Timeout time:", time.ctime(timeout_time))
     while True:
@@ -225,20 +235,24 @@ def receive_one_ping(sock: socket, icmp_id: int, seq: int, timeout: int) -> floa
             raise errors.Timeout(timeout)
         time_recv = time.time()
         recv_data, addr = sock.recvfrom(1024)
-        ip_header_raw, icmp_header_raw, icmp_payload_raw = recv_data[ip_header_slice], recv_data[icmp_header_slice], recv_data[icmp_header_slice.stop:]
+        ip_header_raw, icmp_header_raw, icmp_payload_raw = recv_data[ip_header_slice], recv_data[
+            icmp_header_slice], recv_data[icmp_header_slice.stop:]
         ip_header = read_ip_header(ip_header_raw)
         _debug("Received IP Header:", ip_header)
         icmp_header = read_icmp_header(icmp_header_raw)
         _debug("Received ICMP Header:", icmp_header)
         _debug("Received ICMP Payload:", icmp_payload_raw)
-        if icmp_header['id'] and icmp_header['id'] != icmp_id:  # ECHO_REPLY should match the ID field.
+        if icmp_header['id'] and icmp_header[
+            'id'] != icmp_id and sock.type == socket.SOCK_RAW:  # ECHO_REPLY should match the ID field.
             _debug("ICMP ID dismatch. Packet filtered out.")
             continue
-        if icmp_header['type'] == IcmpType.TIME_EXCEEDED:  # TIME_EXCEEDED has no icmp_id and icmp_seq. Usually they are 0.
+        if icmp_header[
+            'type'] == IcmpType.TIME_EXCEEDED:  # TIME_EXCEEDED has no icmp_id and icmp_seq. Usually they are 0.
             if icmp_header['code'] == IcmpTimeExceededCode.TTL_EXPIRED:
                 raise errors.TimeToLiveExpired()  # Some router does not report TTL expired and then timeout shows.
             raise errors.TimeExceeded()
-        if icmp_header['type'] == IcmpType.DESTINATION_UNREACHABLE:  # DESTINATION_UNREACHABLE has no icmp_id and icmp_seq. Usually they are 0.
+        if icmp_header[
+            'type'] == IcmpType.DESTINATION_UNREACHABLE:  # DESTINATION_UNREACHABLE has no icmp_id and icmp_seq. Usually they are 0.
             if icmp_header['code'] == IcmpDestinationUnreachableCode.DESTINATION_HOST_UNREACHABLE:
                 raise errors.DestinationHostUnreachable()
             raise errors.DestinationUnreachable()
@@ -253,7 +267,8 @@ def receive_one_ping(sock: socket, icmp_id: int, seq: int, timeout: int) -> floa
 
 
 @_func_logger
-def ping(dest_addr: str, timeout: int = 4, unit: str = "s", src_addr: str = None, ttl: int = 64, seq: int = 0, size: int = 56) -> float or None:
+def ping(dest_addr: str, timeout: int = 4, unit: str = "s", src_addr: str = None, ttl: int = 64, seq: int = 0,
+         size: int = 56, privilege: bool = True) -> float or None:
     """
     Send one ping to destination address with the given timeout.
 
@@ -265,6 +280,7 @@ def ping(dest_addr: str, timeout: int = 4, unit: str = "s", src_addr: str = None
         ttl: The Time-To-Live of the outgoing packet. Default is 64, same as in Linux and macOS. (default 64)
         seq: ICMP packet sequence, usually increases from 0 in the same process. (default 0)
         size: The ICMP packet payload size in bytes. If the input of this is less than the bytes of a double format (usually 8), the size of ICMP packet payload is 8 bytes to hold a time. The max should be the router_MTU(Usually 1480) - IP_Header(20) - ICMP_Header(8). Default is 56, same as in macOS. (default 56)
+        privilege: Type of privilege to define type of socket : True for SOCK_RAW False for SOCK_DGRAM (only works on Unix system)
 
     Returns:
         The delay in seconds/milliseconds or None on timeout.
@@ -272,12 +288,17 @@ def ping(dest_addr: str, timeout: int = 4, unit: str = "s", src_addr: str = None
     Raises:
         PingError: Any PingError will raise again if `ping3.EXCEPTIONS` is True.
     """
-    with socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP) as sock:
+    if not privilege and platform.system() != "Windows":
+        sock_type = socket.SOCK_DGRAM
+    else:
+        sock_type = socket.SOCK_RAW
+    with socket.socket(socket.AF_INET, sock_type, socket.IPPROTO_ICMP) as sock:
         sock.setsockopt(socket.SOL_IP, socket.IP_TTL, ttl)
         if src_addr:
             sock.bind((src_addr, 0))  # only packets send to src_addr are received.
             _debug("Socket Source Address Binded:", src_addr)
-        thread_id = threading.get_native_id() if hasattr(threading, 'get_native_id') else threading.currentThread().ident  # threading.get_native_id() is supported >= python3.8.
+        thread_id = threading.get_native_id() if hasattr(threading,
+                                                         'get_native_id') else threading.currentThread().ident  # threading.get_native_id() is supported >= python3.8.
         icmp_id = checksum(str(thread_id).encode())  # using checksum to avoid icmp_id collision.
         try:
             send_one_ping(sock=sock, dest_addr=dest_addr, icmp_id=icmp_id, seq=seq, size=size)
@@ -330,4 +351,5 @@ def verbose_ping(dest_addr: str, count: int = 4, interval: float = 0, *args, **k
 
 if __name__ == "__main__":
     import command_line_ping3
+
     command_line_ping3.main()
