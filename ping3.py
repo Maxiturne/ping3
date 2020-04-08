@@ -242,12 +242,10 @@ def receive_one_ping(sock: socket, icmp_id: int, seq: int, timeout: int) -> floa
         icmp_header = read_icmp_header(icmp_header_raw)
         _debug("Received ICMP Header:", icmp_header)
         _debug("Received ICMP Payload:", icmp_payload_raw)
-        if icmp_header['id'] and icmp_header[
-            'id'] != icmp_id and sock.type == socket.SOCK_RAW:  # ECHO_REPLY should match the ID field.
+        if icmp_header['id'] and icmp_header['id'] != icmp_id and sock.type == socket.SOCK_RAW:  # ECHO_REPLY should match the ID field.
             _debug("ICMP ID dismatch. Packet filtered out.")
             continue
-        if icmp_header[
-            'type'] == IcmpType.TIME_EXCEEDED:  # TIME_EXCEEDED has no icmp_id and icmp_seq. Usually they are 0.
+        if icmp_header['type'] == IcmpType.TIME_EXCEEDED:  # TIME_EXCEEDED has no icmp_id and icmp_seq. Usually they are 0.
             if icmp_header['code'] == IcmpTimeExceededCode.TTL_EXPIRED:
                 raise errors.TimeToLiveExpired()  # Some router does not report TTL expired and then timeout shows.
             raise errors.TimeExceeded()
@@ -256,7 +254,7 @@ def receive_one_ping(sock: socket, icmp_id: int, seq: int, timeout: int) -> floa
             if icmp_header['code'] == IcmpDestinationUnreachableCode.DESTINATION_HOST_UNREACHABLE:
                 raise errors.DestinationHostUnreachable()
             raise errors.DestinationUnreachable()
-        if icmp_header['id'] and icmp_header['seq'] == seq:  # ECHO_REPLY should match the SEQ field.
+        if icmp_header['id'] and icmp_header['seq'] == seq or sock.type==socket.SOCK_DGRAM:  # ECHO_REPLY should match the SEQ field.
             if icmp_header['type'] == IcmpType.ECHO_REQUEST:  # filters out the ECHO_REQUEST itself.
                 _debug("ECHO_REQUEST received. Packet filtered out.")
                 continue
