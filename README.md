@@ -163,10 +163,27 @@ error.HostUnknown: Cannot resolve: Unknown host. (Host = not.exist.com)
 error.TimeToLiveExpired: Time exceeded: Time To Live expired.
 ```
 
-## Command Line Exexcution
+### Pinging without `root` privileges
+
+This only works on Unix systems (mac and linux machines) and allow the user to use a `sock_dgram` instead of a `sock_raw` socket.
+Take care that the user still need to be authorize : check permissions on /proc/sys/net/ipv4/ping_group_range to see if you are allowed
+This change has been proposed by [mjpieters](https://github.com/mjpieters) in an [issue post](https://github.com/kyan001/ping3/issues/10).
+```python
+>>> ping('example.com', privilege=False)  # Set ICMP packet payload to 56 bytes. The total ICMP packet size is 8 (header) + 56 (payload) = 64 bytes. Default size=56.
+0.09196901321411133
+
+>>> verbose_ping('example.com', privilege=False)  # Ping 4 times in a row.
+ping 'example.com' ... 137ms
+ping 'example.com' ... 89ms
+ping 'example.com' ... 88ms
+ping 'example.com' ... 90ms
+```
+
+## Command Line Execution
 
 Execute ping3 from command-line.
-Note: `ping3` needs `root` privilege to send/receive packets. You may want to use `sudo ping3`.
+Note: `ping3` needs `root` privilege to send/receive packets by default. You may want to use `sudo ping3`.
+If you can't be `root` check the section "Pinging without `root` privileges"
 
 ```shell
 $ ping3 --help  # -h/--help. Command-line help message.
