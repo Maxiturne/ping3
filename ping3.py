@@ -256,7 +256,7 @@ def receive_one_ping(sock: socket, icmp_id: int, seq: int, timeout: int) -> floa
             raise errors.DestinationUnreachable()
         _debug("ID : " + str(icmp_header['id']))
         _debug("Seq : " + str(seq) + ";" + str(icmp_header["seq"]))
-        if icmp_header['id'] and icmp_header['seq'] == seq:  # ECHO_REPLY should match the SEQ field.
+        if icmp_header['id'] and (icmp_header['seq'] == seq or sock.type==socket.SOCK_DGRAM):  # ECHO_REPLY should match the SEQ field.
             _debug("Test")
             if icmp_header['type'] == IcmpType.ECHO_REQUEST:  # filters out the ECHO_REQUEST itself.
                 _debug("ECHO_REQUEST received. Packet filtered out.")
