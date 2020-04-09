@@ -261,7 +261,7 @@ def receive_one_ping(sock: socket, icmp_id: int, seq: int, timeout: int) -> floa
             if icmp_header['type'] == IcmpType.ECHO_REQUEST:  # filters out the ECHO_REQUEST itself.
                 _debug("ECHO_REQUEST received. Packet filtered out.")
                 continue
-            if icmp_header['type'] == IcmpType.ECHO_REPLY or icmp_header["type"] == IcmpType.RESERVED_BYTES:
+            if icmp_header['type'] == IcmpType.ECHO_REPLY or icmp_header['type'] >= 41:
                 time_sent = struct.unpack(ICMP_TIME_FORMAT, icmp_payload_raw[0:struct.calcsize(ICMP_TIME_FORMAT)])[0]
                 return time_recv - time_sent
         _debug("Uncatched ICMP Packet:", icmp_header)
