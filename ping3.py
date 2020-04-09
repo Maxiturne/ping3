@@ -242,7 +242,7 @@ def receive_one_ping(sock: socket, icmp_id: int, seq: int, timeout: int) -> floa
         icmp_header = read_icmp_header(icmp_header_raw)
         _debug("Received ICMP Header:", icmp_header)
         _debug("Received ICMP Payload:", icmp_payload_raw)
-        if icmp_header['id'] and icmp_header['id'] != icmp_id and sock.type == socket.SOCK_RAW:  # ECHO_REPLY should match the ID field.
+        if icmp_header['id'] and icmp_header['id'] != icmp_id:  # ECHO_REPLY should match the ID field.
             _debug("ICMP ID dismatch. Packet filtered out.")
             continue
         if icmp_header['type'] == IcmpType.TIME_EXCEEDED:  # TIME_EXCEEDED has no icmp_id and icmp_seq. Usually they are 0.
@@ -254,14 +254,12 @@ def receive_one_ping(sock: socket, icmp_id: int, seq: int, timeout: int) -> floa
             if icmp_header['code'] == IcmpDestinationUnreachableCode.DESTINATION_HOST_UNREACHABLE:
                 raise errors.DestinationHostUnreachable()
             raise errors.DestinationUnreachable()
-        _debug("ID : " + str(icmp_header['id']))
-        _debug("Seq : " + str(seq) + ";" + str(icmp_header["seq"]))
-        if icmp_header['id'] and (icmp_header['seq'] == seq or sock.type==socket.SOCK_DGRAM):  # ECHO_REPLY should match the SEQ field.
-            _debug(icmp_header['type'])
+
+        if icmp_header['id'] and (icmp_header['seq'] == seq or sock.type == socket.SOCK_DGRAM):  # ECHO_REPLY should match the SEQ field.
             if icmp_header['type'] == IcmpType.ECHO_REQUEST:  # filters out the ECHO_REQUEST itself.
                 _debug("ECHO_REQUEST received. Packet filtered out.")
                 continue
-            if icmp_header['type'] == IcmpType.ECHO_REPLY or icmp_header['type'] >= 41:
+            if icmp_header['type'] == IcmpType.ECHO_REPLY or icmp_header['type'] >= 41: # If type is in reserved bytes
                 time_sent = struct.unpack(ICMP_TIME_FORMAT, icmp_payload_raw[0:struct.calcsize(ICMP_TIME_FORMAT)])[0]
                 return time_recv - time_sent
         _debug("Uncatched ICMP Packet:", icmp_header)
