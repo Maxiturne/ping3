@@ -254,6 +254,8 @@ def receive_one_ping(sock: socket, icmp_id: int, seq: int, timeout: int) -> floa
             if icmp_header['code'] == IcmpDestinationUnreachableCode.DESTINATION_HOST_UNREACHABLE:
                 raise errors.DestinationHostUnreachable()
             raise errors.DestinationUnreachable()
+        _debug("ID : " + str(icmp_header['id']))
+        _debug("Seq : " + str(seq) + ";" + str(icmp_header["seq"]))
         if icmp_header['id'] and icmp_header['seq'] == seq:  # ECHO_REPLY should match the SEQ field.
             _debug("Test")
             if icmp_header['type'] == IcmpType.ECHO_REQUEST:  # filters out the ECHO_REQUEST itself.
