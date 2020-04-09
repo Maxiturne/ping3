@@ -254,12 +254,12 @@ def receive_one_ping(sock: socket, icmp_id: int, seq: int, timeout: int) -> floa
             if icmp_header['code'] == IcmpDestinationUnreachableCode.DESTINATION_HOST_UNREACHABLE:
                 raise errors.DestinationHostUnreachable()
             raise errors.DestinationUnreachable()
-        if (icmp_header['id'] and icmp_header['seq'] == seq) or sock.type==socket.SOCK_DGRAM:  # ECHO_REPLY should match the SEQ field.
+        if icmp_header['id'] and icmp_header['seq'] == seq:  # ECHO_REPLY should match the SEQ field.
             _debug("Test")
             if icmp_header['type'] == IcmpType.ECHO_REQUEST:  # filters out the ECHO_REQUEST itself.
                 _debug("ECHO_REQUEST received. Packet filtered out.")
                 continue
-            if icmp_header['type'] == IcmpType.ECHO_REPLY:
+            if icmp_header['type'] == IcmpType.ECHO_REPLY or icmp_header["type"] == IcmpType.RESERVED:
                 time_sent = struct.unpack(ICMP_TIME_FORMAT, icmp_payload_raw[0:struct.calcsize(ICMP_TIME_FORMAT)])[0]
                 return time_recv - time_sent
         _debug("Uncatched ICMP Packet:", icmp_header)
